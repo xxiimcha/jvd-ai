@@ -10,7 +10,10 @@ def chat():
     data = request.get_json()
     user_message = data.get("message", "")
     response = generate_response(user_message)
-    return jsonify(response)
+    if isinstance(response, dict):
+        return jsonify(response)
+    else:
+        return jsonify({"reply": str(response)})
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
