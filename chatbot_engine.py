@@ -2,7 +2,7 @@ import mysql.connector
 import os
 import requests
 
-
+# Database connection
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
@@ -12,24 +12,27 @@ def get_db_connection():
         port=int(os.getenv("DB_PORT", 3306))
     )
 
+# Fetch tours
 def fetch_tours():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT title, price, capacity, schedule_date FROM tour_schedules LIMIT 5")
+    cursor.execute("SELECT id, api_tour_id, title, price, capacity, schedule_date FROM tour_schedules LIMIT 5")
     results = cursor.fetchall()
     cursor.close()
     conn.close()
     return results
 
+# Fetch hotels
 def fetch_hotels():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT hotel_name, location FROM hotels LIMIT 5")
+    cursor.execute("SELECT id, hotel_name, location FROM hotels LIMIT 5")
     results = cursor.fetchall()
     cursor.close()
     conn.close()
     return results
 
+# Fetch vehicles from external API
 def fetch_vehicles():
     try:
         res = requests.get("https://logistic2.easetravelandtours.com/api/vehicle")
@@ -38,21 +41,51 @@ def fetch_vehicles():
     except:
         return []
 
+# Format tours with links
 def format_tours(tours):
     if not tours:
         return "No tours found."
-    return "\n".join([f"{t['title']} - ₱{t['price']:.2f} - Capacity: {t['capacity']} - Date: {t['schedule_date']}" for t in tours])
+    return "".join([
+        f"""
+        <div class='chat-result'>
+            <strong>{t['title']}</strong><br>
+            💰 ₱{t['price']:.2f} | 👥 Capacity: {t['capacity']} | 📅 {t['schedule_date']}<br>
+            <a href='https://core1.easetravelandtours.com/tours/{t['api_tour_id']}' target='_blank'>🔗 View Tour</a>
+        </div>
+        """ for t in tours
+    ])
 
+# Format hotels with links
 def format_hotels(hotels):
     if not hotels:
         return "No hotels found."
-    return "\n".join([f"{h['hotel_name']} - {h['location']}" for h in hotels])
+    return "".join([
+        f"""
+        <div class='chat-result'>
+            <strong>{h['hotel_name']}</strong><br>
+            📍 {h['location']}<br>
+            <a href='https://core1.easetravelandtours.com/hotels/{h['id']}' target='_blank'>🔗 View Hotel</a>
+        </div>
+        """ for h in hotels
+    ])
 
+# Format vehicles with image
 def format_vehicles(vehicles):
     if not vehicles:
         return "No vehicles found."
-    return "\n".join([f"{v['vehicle_type']} - {v['model']} - Capacity: {v['capacity']}" for v in vehicles])
+    return "".join([
+        f"""
+        <div class='chat-result'>
+            <strong>{v['vehicle_type']}</strong><br>
+            🚗 {v['model']} | 👥 Capacity: {v['capacity']}<br>
+            <img src="https://logistic2.easetravelandtours.com/storage/{v['image_path']}" 
+                 alt="{v['model']}" 
+                 style="width:100%; max-width:250px; margin-top:5px; border-radius:8px;">
+        </div>
+        """ for v in vehicles
+    ])
 
+# Generate bot response
 def generate_response(message):
     message = message.lower()
     if "tour" in message:
@@ -62,4 +95,7 @@ def generate_response(message):
     elif "vehicle" in message or "car" in message:
         return {"reply": format_vehicles(fetch_vehicles())}
     else:
-        return {"reply": "I'm sorry, I can help you with available tours, hotels, or vehicles. What would you like to know?"}
+        return {"reply": """
+        I'm sorry, I can help you with available <strong>tours</strong>, <strong>hotels</strong>, or <strong>vehicles</strong>.<br>
+        <em>What would you like to know?</em>
+        """}
