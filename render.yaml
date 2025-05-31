@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: flask-chatbot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: DB_HOST
+        value: 157.173.111.118
+      - key: DB_PORT
+        value: 3306
+      - key: DB_DATABASE
+        value: core1_jvd
+      - key: DB_USERNAME
+        value: core1_core1_jvd
+      - key: DB_PASSWORD
+        value: core1_jvd
