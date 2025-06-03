@@ -88,7 +88,27 @@ def format_vehicles(vehicles):
 # Generate bot response
 def generate_response(message):
     message = message.lower()
-    if "tour" in message:
+
+    keywords = {
+        "tour": ["tour", "package", "tour price"],
+        "hotel": ["hotel", "room", "accommodation"],
+        "vehicle": ["vehicle", "bus", "car", "van", "service", "jeep"]
+    }
+
+    # Smart keyword + price/amount trigger
+    if any(word in message for word in ["magkano", "price", "presyo", "cost", "amount"]):
+        if any(k in message for k in keywords["tour"]):
+            return {"reply": format_tours(fetch_tours())}
+        elif any(k in message for k in keywords["hotel"]):
+            return {"reply": format_hotels(fetch_hotels())}
+        elif any(k in message for k in keywords["vehicle"]):
+            return {"reply": format_vehicles(fetch_vehicles())}
+        else:
+            return {"reply": """
+                I noticed you're asking about pricing. Please clarify if you're referring to a <strong>tour</strong>, <strong>hotel</strong>, or <strong>vehicle</strong>.<br>
+                Example: <em>“Magkano po ang bus?”</em> or <em>“Tour package price”</em>
+            """}
+    elif "tour" in message:
         return {"reply": format_tours(fetch_tours())}
     elif "hotel" in message:
         return {"reply": format_hotels(fetch_hotels())}
@@ -96,6 +116,6 @@ def generate_response(message):
         return {"reply": format_vehicles(fetch_vehicles())}
     else:
         return {"reply": """
-        I'm sorry, I can help you with available <strong>tours</strong>, <strong>hotels</strong>, or <strong>vehicles</strong>.<br>
-        <em>What would you like to know?</em>
+            I'm here to help you explore available <strong>tours</strong>, <strong>hotels</strong>, or <strong>vehicles</strong>.<br>
+            Try asking something like: <em>“Show me hotel options in Baguio”</em> or <em>“Magkano po ang tour sa Cebu?”</em>
         """}
