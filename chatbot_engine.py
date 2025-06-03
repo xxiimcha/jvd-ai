@@ -26,7 +26,7 @@ def fetch_tours():
 def fetch_hotels():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, hotel_name, location FROM hotels LIMIT 5")
+    cursor.execute("SELECT id, hotel_name, location, price FROM hotels LIMIT 5")
     results = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -49,13 +49,13 @@ def format_tours(tours):
         f"""
         <div class='chat-result'>
             <strong>{t['title']}</strong><br>
-            💰 ₱{t['price']:.2f} | 👥 Capacity: {t['capacity']} | 📅 {t['schedule_date']}<br>
+            💰 ₱{t['price']:,.2f} | 👥 Capacity: {t['capacity']} | 📅 {t['schedule_date']}<br>
             <a href='https://core1.easetravelandtours.com/tours/{t['api_tour_id']}' target='_blank'>🔗 View Tour</a>
         </div>
         """ for t in tours
     ])
 
-# Format hotels with links
+# Format hotels with links and price
 def format_hotels(hotels):
     if not hotels:
         return "No hotels found."
@@ -64,12 +64,13 @@ def format_hotels(hotels):
         <div class='chat-result'>
             <strong>{h['hotel_name']}</strong><br>
             📍 {h['location']}<br>
+            💰 ₱{h['price']:,.2f}<br>
             <a href='https://core1.easetravelandtours.com/hotels/{h['id']}' target='_blank'>🔗 View Hotel</a>
         </div>
         """ for h in hotels
     ])
 
-# Format vehicles with image
+# Format vehicles with image and rate
 def format_vehicles(vehicles):
     if not vehicles:
         return "No vehicles found."
@@ -78,6 +79,7 @@ def format_vehicles(vehicles):
         <div class='chat-result'>
             <strong>{v['vehicle_type']}</strong><br>
             🚗 {v['model']} | 👥 Capacity: {v['capacity']}<br>
+            💰 ₱{v.get('rate', 0):,.2f}<br>
             <img src="https://logistic2.easetravelandtours.com/storage/{v['image_path']}" 
                  alt="{v['model']}" 
                  style="width:100%; max-width:250px; margin-top:5px; border-radius:8px;">
