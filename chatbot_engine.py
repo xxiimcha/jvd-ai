@@ -13,35 +13,43 @@ def get_db_connection():
     )
 
 # Fetch tours
-def fetch_tours():
+def fetch_tours(search=None):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, api_tour_id, title, price, capacity, schedule_date FROM tour_schedules LIMIT 5")
+    if search:
+        cursor.execute("SELECT id, api_tour_id, title, price, capacity, schedule_date FROM tour_schedules WHERE title LIKE %s LIMIT 5", (f"%{search}%",))
+    else:
+        cursor.execute("SELECT id, api_tour_id, title, price, capacity, schedule_date FROM tour_schedules LIMIT 5")
     results = cursor.fetchall()
     cursor.close()
     conn.close()
     return results
 
 # Fetch hotels
-def fetch_hotels():
+def fetch_hotels(search=None):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, hotel_name, location, price FROM hotels LIMIT 5")
+    if search:
+        cursor.execute("SELECT id, hotel_name, location, price FROM hotels WHERE hotel_name LIKE %s LIMIT 5", (f"%{search}%",))
+    else:
+        cursor.execute("SELECT id, hotel_name, location, price FROM hotels LIMIT 5")
     results = cursor.fetchall()
     cursor.close()
     conn.close()
     return results
 
 # Fetch vehicles from external API
-def fetch_vehicles():
+def fetch_vehicles(search=None):
     try:
         res = requests.get("https://logistic2.easetravelandtours.com/api/vehicle")
-        data = res.json()
-        return data["data"][:5]
+        data = res.json()["data"]
+        if search:
+            data = [v for v in data if search.lower() in v['model'].lower() or search.lower() in v['vehicle_type'].lower()]
+        return data[:5]
     except:
         return []
 
-# Format tours with links
+# Format tours
 def format_tours(tours):
     if not tours:
         return "No tours found."
@@ -55,7 +63,7 @@ def format_tours(tours):
         """ for t in tours
     ])
 
-# Format hotels with links and price
+# Format hotels
 def format_hotels(hotels):
     if not hotels:
         return "No hotels found."
@@ -70,7 +78,7 @@ def format_hotels(hotels):
         """ for h in hotels
     ])
 
-# Format vehicles with image and rate
+# Format vehicles
 def format_vehicles(vehicles):
     if not vehicles:
         return "No vehicles found."
@@ -80,44 +88,58 @@ def format_vehicles(vehicles):
             <strong>{v['vehicle_type']}</strong><br>
             🚗 {v['model']} | 👥 Capacity: {v['capacity']}<br>
             💰 ₱{v.get('rate', 0):,.2f}<br>
-            <img src="https://logistic2.easetravelandtours.com/storage/{v['image_path']}" 
-                 alt="{v['model']}" 
-                 style="width:100%; max-width:250px; margin-top:5px; border-radius:8px;">
+            <img src='https://logistic2.easetravelandtours.com/storage/{v['image_path']}' alt='{v['model']}' style='width:100%; max-width:250px; margin-top:5px; border-radius:8px;'>
         </div>
         """ for v in vehicles
     ])
+
+# Get lowest price from each category
+def get_lowest_priced_items():
+    tours = fetch_tours()
+    hotels = fetch_hotels()
+    vehicles = fetch_vehicles()
+
+    lowest_tour = min(tours, key=lambda x: x['price']) if tours else None
+    lowest_hotel = min(hotels, key=lambda x: x['price']) if hotels else None
+    lowest_vehicle = min(vehicles, key=lambda x: v.get('rate', 0)) if vehicles else None
+
+    sections = []
+    if lowest_tour:
+        sections.append("<strong>Lowest Tour:</strong><br>" + format_tours([lowest_tour]))
+    if lowest_hotel:
+        sections.append("<strong>Lowest Hotel:</strong><br>" + format_hotels([lowest_hotel]))
+    if lowest_vehicle:
+        sections.append("<strong>Lowest Vehicle:</strong><br>" + format_vehicles([lowest_vehicle]))
+    return "<hr>".join(sections)
 
 # Generate bot response
 def generate_response(message):
     message = message.lower()
 
-    keywords = {
-        "tour": ["tour", "package", "tour price"],
-        "hotel": ["hotel", "room", "accommodation"],
-        "vehicle": ["vehicle", "bus", "car", "van", "service", "jeep"]
-    }
+    if any(word in message for word in ["cheapest", "lowest", "pinakamura"]):
+        return {"reply": get_lowest_priced_items()}
 
-    # Smart keyword + price/amount trigger
     if any(word in message for word in ["magkano", "price", "presyo", "cost", "amount"]):
-        if any(k in message for k in keywords["tour"]):
+        if any(k in message for k in ["tour", "package"]):
             return {"reply": format_tours(fetch_tours())}
-        elif any(k in message for k in keywords["hotel"]):
+        elif any(k in message for k in ["hotel", "room"]):
             return {"reply": format_hotels(fetch_hotels())}
-        elif any(k in message for k in keywords["vehicle"]):
+        elif any(k in message for k in ["vehicle", "bus", "van", "car"]):
             return {"reply": format_vehicles(fetch_vehicles())}
-        else:
-            return {"reply": """
-                I noticed you're asking about pricing. Please clarify if you're referring to a <strong>tour</strong>, <strong>hotel</strong>, or <strong>vehicle</strong>.<br>
-                Example: <em>“Magkano po ang bus?”</em> or <em>“Tour package price”</em>
-            """}
-    elif "tour" in message:
-        return {"reply": format_tours(fetch_tours())}
-    elif "hotel" in message:
-        return {"reply": format_hotels(fetch_hotels())}
-    elif "vehicle" in message or "car" in message:
-        return {"reply": format_vehicles(fetch_vehicles())}
-    else:
-        return {"reply": """
-            I'm here to help you explore available <strong>tours</strong>, <strong>hotels</strong>, or <strong>vehicles</strong>.<br>
-            Try asking something like: <em>“Show me hotel options in Baguio”</em> or <em>“Magkano po ang tour sa Cebu?”</em>
-        """}
+
+    # Search by name for any term
+    for category in ["tour", "hotel", "vehicle"]:
+        if category in message:
+            search_term = message.replace(category, "").strip()
+            if category == "tour":
+                return {"reply": format_tours(fetch_tours(search_term))}
+            elif category == "hotel":
+                return {"reply": format_hotels(fetch_hotels(search_term))}
+            elif category == "vehicle":
+                return {"reply": format_vehicles(fetch_vehicles(search_term))}
+
+    return {"reply": """
+        I'm here to help you explore available <strong>tours</strong>, <strong>hotels</strong>, or <strong>vehicles</strong>.<br>
+        Try asking things like:<br>
+        <em>“Magkano ang bus 6?”</em> or <em>“Show cheapest hotel”</em> or <em>“Tour sa Cebu”</em>
+    """}
